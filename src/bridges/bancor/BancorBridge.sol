@@ -12,7 +12,6 @@ import {IBancorNetwork} from "../../interfaces/bancor/IBancorNetwork.sol";
 
 /**
  * @title Aztec Connect Bridge for swapping on Bancor
- * @author Jan Benes (@benesjan on Github and Telegram)
  * @notice You can use this contract to swap tokens on Bancor v3 VIA the Bancor Omnipool.
  */
 contract BancorBridge is BridgeBase {
