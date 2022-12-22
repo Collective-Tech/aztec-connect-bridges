@@ -73,63 +73,40 @@ contract BancorBridgeE2ETest is BridgeTestBase {
 
     // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
     function testBancorBridgeE2ETest(uint96 _depositAmount) public {
-        // vm.assume(_depositAmount > 1);
-        // vm.warp(block.timestamp + 1 days);
-        //
-        // // set up approvals for tokens on all sides
-        //         {
-        //             address[] memory tokensIn = new address[](2);
-        //             tokensIn[0] = USDC;
-        //             tokensIn[1] = DAI;
-        //
-        //
-        //             address[] memory tokensOut = new address[](2);
-        //             tokensOut[0] = USDC;
-        //             tokensOut[1] = DAI;
-        //
-        //
-        //             bridge.preApproveTokens(tokensIn, tokensOut);
-        //         }
-        //
-        // // Use the helper function to fetch the support AztecAssets for USDC and DAI
-        // AztecTypes.AztecAsset memory usdcAsset = ROLLUP_ENCODER.getRealAztecAsset(address(USDC));
-        // AztecTypes.AztecAsset memory daiAsset = ROLLUP_ENCODER.getRealAztecAsset(address(DAI));
-        //
-        // // Mint the depositAmount of Dai to rollupProcessor
-        // deal(USDC, address(ROLLUP_PROCESSOR), _depositAmount);
-        //
-        // // Computes the encoded data for the specific bridge interaction
-        // ROLLUP_ENCODER.defiInteractionL2(id, usdcAsset, emptyAsset, daiAsset, emptyAsset, 0, _depositAmount);
-        //
-        // // Execute the rollup with the bridge interaction. Ensure that event as seen above is emitted.
-        // (uint256 outputValueA, uint256 outputValueB, bool isAsync) = ROLLUP_ENCODER.processRollupAndGetBridgeResult();
-        //
-        // // Note: Unlike in unit tests there is no need to manually transfer the tokens - RollupProcessor does this
-        // // Check the output values are as expected
-        // assertEq(outputValueA, _depositAmount, "outputValueA doesn't equal deposit");
-        // assertEq(outputValueB, 0, "Non-zero outputValueB");
-        // assertFalse(isAsync, "Bridge is not synchronous");
-        //
-        // // Check that the balance of the rollup is same as before interaction (bridge just sends funds back)
-        // assertEq(_depositAmount, IERC20(USDC).balanceOf(address(ROLLUP_PROCESSOR)), "Balances must match");
-        //
-        // // Perform a second rollup with half the deposit, perform similar checks.
-        // uint256 secondDeposit = _depositAmount / 2;
-        //
-        // ROLLUP_ENCODER.defiInteractionL2(id, usdcAsset, emptyAsset, daiAsset, emptyAsset, 0, secondDeposit);
-        //
-        // // Execute the rollup with the bridge interaction. Ensure that event as seen above is emitted.
-        // (outputValueA, outputValueB, isAsync) = ROLLUP_ENCODER.processRollupAndGetBridgeResult();
-        //
-        // // Check the output values are as expected
-        // assertEq(outputValueA, secondDeposit, "outputValueA doesn't equal second deposit");
-        // assertEq(outputValueB, 0, "Non-zero outputValueB");
-        // assertFalse(isAsync, "Bridge is not synchronous");
-        //
-        // // Check that the balance of the rollup is same as before interaction (bridge just sends funds back)
-        // assertEq(_depositAmount, IERC20(USDC).balanceOf(address(ROLLUP_PROCESSOR)), "Balances must match");
-        //
-        // assertGt(SUBSIDY.claimableAmount(BENEFICIARY), 0, "Claimable was not updated");
+        vm.assume(_depositAmount > 1);
+        vm.warp(block.timestamp + 1 days);
+
+        // set up approvals for tokens on all sides
+                {
+                    address[] memory tokensIn = new address[](2);
+                    tokensIn[0] = USDC;
+                    tokensIn[1] = DAI;
+
+
+                    address[] memory tokensOut = new address[](2);
+                    tokensOut[0] = USDC;
+                    tokensOut[1] = DAI;
+
+
+                    bridge.preApproveTokens(tokensIn, tokensOut);
+                }
+
+        // Use the helper function to fetch the support AztecAssets for USDC and DAI
+        AztecTypes.AztecAsset memory usdcAsset = ROLLUP_ENCODER.getRealAztecAsset(address(USDC));
+        AztecTypes.AztecAsset memory daiAsset = ROLLUP_ENCODER.getRealAztecAsset(address(DAI));
+
+        // Mint the depositAmount of USDC to rollupProcessor
+        deal(USDC, address(ROLLUP_PROCESSOR), _depositAmount);
+
+        // Computes the encoded data for the specific bridge interaction
+        uint256 bridgeCallData =
+            ROLLUP_ENCODER.defiInteractionL2(id, usdcAsset, emptyAsset, daiAsset, emptyAsset, 0, _depositAmount);
+
+
+        ROLLUP_ENCODER.registerEventToBeChecked(
+            bridgeCallData, ROLLUP_ENCODER.getNextNonce(), _depositAmount, 1, 0, true, ""
+        );
+        ROLLUP_ENCODER.processRollup();
     }
 
 
