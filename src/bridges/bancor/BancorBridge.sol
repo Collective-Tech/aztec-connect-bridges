@@ -129,6 +129,8 @@ contract BancorBridge is BridgeBase {
                 IWETH(WETH).withdraw(outputValueA);
                 IRollupProcessor(ROLLUP_PROCESSOR).receiveEthFromBridge{value: outputValueA}(_interactionNonce);
             }
+
+            return (outputValueA, 0, false);
     }
 
 
@@ -174,7 +176,7 @@ contract BancorBridge is BridgeBase {
          AztecTypes.AztecAsset calldata _outputAssetA,
          AztecTypes.AztecAsset calldata,
          uint64
-     ) public view override (BridgeBase) returns (uint256) {
+     ) public pure override (BridgeBase) returns (uint256) {
          return uint256(keccak256(abi.encodePacked(_inputAssetA.erc20Address, _outputAssetA.erc20Address)));
      }
 
