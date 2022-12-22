@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity 0.8.13;
+pragma solidity 0.8.10;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { IUpgradeable } from "../../utility/interfaces/IUpgradeable.sol";
+import { IUpgradeable } from "./support/IUpgradeable.sol";
 
-import { Token } from "../../token/Token.sol";
+import { Token } from "./support/Token.sol";
 
-import { IPoolCollection } from "../../pools/interfaces/IPoolCollection.sol";
-import { IPoolToken } from "../../pools/interfaces/IPoolToken.sol";
+import { IPoolCollection } from "./support/IPoolCollection.sol";
+import { IPoolToken } from "./support/IPoolToken.sol";
 
 /**
  * @dev Flash-loan recipient interface

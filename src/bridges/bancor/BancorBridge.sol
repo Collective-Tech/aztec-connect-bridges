@@ -7,8 +7,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {AztecTypes} from "rollup-encoder/libraries/AztecTypes.sol";
 import {IRollupProcessor} from "rollup-encoder/interfaces/IRollupProcessor.sol";
 import {ErrorLib} from "../base/ErrorLib.sol";
+import {IWETH} from "../../interfaces/IWETH.sol";
 import {BridgeBase} from "../base/BridgeBase.sol";
 import {IBancorNetwork} from "../../interfaces/bancor/IBancorNetwork.sol";
+import {Token} from "../../interfaces/bancor/support/Token.sol";
+
 
 /**
  * @title Aztec Connect Bridge for swapping on Bancor
@@ -22,6 +25,7 @@ contract BancorBridge is BridgeBase {
       uint256 deadline;
     }
 
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // @dev Event which is emitted when the output token doesn't implement decimals().
 
@@ -81,9 +85,9 @@ contract BancorBridge is BridgeBase {
      */
     function convert(
         AztecTypes.AztecAsset calldata _inputAssetA,
-        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata _inputAssetB,
         AztecTypes.AztecAsset calldata _outputAssetA,
-        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata _outputAssetB,
         uint256 _totalInputValue,
         uint256 _interactionNonce,
         uint64 _auxData,
@@ -91,7 +95,7 @@ contract BancorBridge is BridgeBase {
     ) external payable override (BridgeBase) onlyRollup returns (uint256 outputValueA, uint256, bool) {
         // Accumulate subsidy to _rollupBeneficiary
         SUBSIDY.claimSubsidy(
-            _computeCriteria(_inputAssetA.erc20Address, _outputAssetA.erc20Address), _rollupBeneficiary
+          computeCriteria(_inputAssetA, _inputAssetB, _outputAssetA, _outputAssetB, _auxData), _rollupBeneficiary
         );
 
         bool inputIsEth = _inputAssetA.assetType == AztecTypes.AztecAssetType.ETH;
@@ -104,17 +108,27 @@ contract BancorBridge is BridgeBase {
             revert ErrorLib.InvalidOutputA();
         }
 
+        Token iT = Token(_inputAssetA.erc20Address);
+
+        Token oT = Token(_outputAssetA.erc20Address);
+
+
         TradeData memory td = _decodeTradeData(_auxData);
 
             // Swap using the first swap path
             outputValueA = BANCOR.tradeBySourceAmount(
-              _inputAssetA.address,
-              _outputAssetA.address,
+              iT,
+              oT,
               _totalInputValue,
               td.minReturnAmount,
               td.deadline,
               _rollupBeneficiary
             );
+
+            if (outputIsEth) {
+                IWETH(WETH).withdraw(outputValueA);
+                IRollupProcessor(ROLLUP_PROCESSOR).receiveEthFromBridge{value: outputValueA}(_interactionNonce);
+            }
     }
 
 
@@ -136,7 +150,7 @@ contract BancorBridge is BridgeBase {
     /**
      * @notice decodes a uint64 into its original token amount and Unix time value
      * @param encoded is the uint64 encoded data for a token amount and a unix time stamp
-     * @return is the decoded token and unix timestamp data both in uint256 stored in a tradeData struct
+     * @return td is the decoded token and unix timestamp data both in uint256 stored in a tradeData struct
      * @dev This function uses bit shifting and bitwise operations to decode the data.
             This function shifts the encoded value right by 32 bits using the >> operator
             to get the original token amount, and ANDs it with 0xffffffff using the & operator
@@ -146,6 +160,22 @@ contract BancorBridge is BridgeBase {
        // Shift the encoded value right by 32 bits to get the token amount, and AND it with 2^32 - 1 to get the unix time value
          td.minReturnAmount = uint256(encoded >> 32);
          td.deadline = encoded & 0xffffffff;
+     }
+
+     /**
+      * @notice Computes the criteria that is passed when claiming subsidy.
+      * @param _inputAssetA The input asset
+      * @param _outputAssetA The output asset
+      * @return The criteria
+      */
+     function computeCriteria(
+         AztecTypes.AztecAsset calldata _inputAssetA,
+         AztecTypes.AztecAsset calldata,
+         AztecTypes.AztecAsset calldata _outputAssetA,
+         AztecTypes.AztecAsset calldata,
+         uint64
+     ) public view override (BridgeBase) returns (uint256) {
+         return uint256(keccak256(abi.encodePacked(_inputAssetA.erc20Address, _outputAssetA.erc20Address)));
      }
 
 }

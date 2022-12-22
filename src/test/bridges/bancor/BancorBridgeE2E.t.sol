@@ -7,7 +7,7 @@ import {AztecTypes} from "rollup-encoder/libraries/AztecTypes.sol";
 
 // Example-specific imports
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {BancorBridge} from "../../../bridges/example/BancorBridge.sol";
+import {BancorBridge} from "../../../bridges/bancor/BancorBridge.sol";
 import {ErrorLib} from "../../../bridges/base/ErrorLib.sol";
 
 /**
@@ -60,7 +60,7 @@ contract BancorBridgeE2ETest is BridgeTestBase {
         AztecTypes.AztecAsset memory usdcAsset = ROLLUP_ENCODER.getRealAztecAsset(USDC);
         AztecTypes.AztecAsset memory daiAsset = ROLLUP_ENCODER.getRealAztecAsset(DAI);
 
-        uint256 criteria = bridge.computeCriteria(usdcAsset, DAI, usdcAsset, DAI, 0);
+        uint256 criteria = bridge.computeCriteria(usdcAsset, daiAsset, usdcAsset, daiAsset, 0);
         uint32 gasPerMinute = 200;
         SUBSIDY.subsidize{value: 1 ether}(address(bridge), criteria, gasPerMinute);
 
@@ -75,15 +75,15 @@ contract BancorBridgeE2ETest is BridgeTestBase {
         vm.assume(_depositAmount > 1);
         vm.warp(block.timestamp + 1 days);
 
-        // set up approvals for tokens on all sides 
+        // set up approvals for tokens on all sides
                 {
                     address[] memory tokensIn = new address[](2);
                     tokensIn[0] = USDC;
-                    tokensIn[1] = USDC;
+                    tokensIn[1] = DAI;
 
 
                     address[] memory tokensOut = new address[](2);
-                    tokensOut[0] = LQTY;
+                    tokensOut[0] = USDC;
                     tokensOut[1] = DAI;
 
 
