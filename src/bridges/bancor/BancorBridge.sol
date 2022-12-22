@@ -36,7 +36,27 @@ contract BancorBridge is BridgeBase {
      * @notice Set the address of rollup processor.
      * @param _rollupProcessor Address of rollup processor
      */
-    constructor(address _rollupProcessor) BridgeBase(_rollupProcessor) {}
+    constructor(address _rollupProcessor) BridgeBase(_rollupProcessor) {
+      address dai = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+      address usdc = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+
+      uint256[] memory criterias = new uint256[](2);
+      uint32[] memory gasUsage = new uint32[](2);
+      uint32[] memory minGasPerMinute = new uint32[](2);
+
+      criterias[0] = uint256(keccak256(abi.encodePacked(dai, usdc)));
+      criterias[1] = uint256(keccak256(abi.encodePacked(usdc, dai)));
+
+      gasUsage[0] = 72896;
+      gasUsage[1] = 80249;
+
+      minGasPerMinute[0] = 100;
+      minGasPerMinute[1] = 150;
+
+      // We set gas usage in the subsidy contract
+      // We only want to incentivize the bridge when input and output token is Dai or USDC
+      SUBSIDY.setGasUsageAndMinGasPerMinute(criterias, gasUsage, minGasPerMinute);
+    }
 
     // @dev Empty method which is present here in order to be able to receive ETH when unwrapping WETH.
     receive() external payable {}

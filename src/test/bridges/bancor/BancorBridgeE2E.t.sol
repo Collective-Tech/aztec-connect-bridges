@@ -28,6 +28,8 @@ contract BancorBridgeE2ETest is BridgeTestBase {
     function setUp() public {
         // Deploy a new example bridge
         bridge = new BancorBridge(address(ROLLUP_PROCESSOR));
+
+
         // Use the label to mark the bridge address with "Bancor Bridge" in the traces
         vm.label(address(bridge), "Bancor Bridge");
         // Use the label to mark the Bancor Network contract address with "Bancor network" in the traces
@@ -54,18 +56,29 @@ contract BancorBridgeE2ETest is BridgeTestBase {
         // Fetch the id of the example bridge
         id = ROLLUP_PROCESSOR.getSupportedBridgesLength();
 
+        emit log_named_address("Rollup processor address is: ", address(ROLLUP_PROCESSOR));
+        emit log_named_address("Bancor Bridgeaddress is: ", address(bridge));
+        emit log_named_address("Subsidy address is: ", address(SUBSIDY));
+        emit log_named_address("DAI address is: ", address(DAI));
+        emit log_named_address("USDC address is: ", address(USDC));
+        emit log_named_address("BancorNetwork address is: ", address(bridge.BANCOR()));
+        emit log_named_uint("Bridge ID is: ", id);
+
+
         // Subsidize the bridge when used with USDC and DAI and register a beneficiary
         AztecTypes.AztecAsset memory usdcAsset = ROLLUP_ENCODER.getRealAztecAsset(USDC);
         AztecTypes.AztecAsset memory daiAsset = ROLLUP_ENCODER.getRealAztecAsset(DAI);
 
         uint256 criteria = bridge.computeCriteria(usdcAsset, emptyAsset, daiAsset, emptyAsset, 0);
+        emit log_named_uint("criteria is: ", criteria);
+
         uint32 gasPerMinute = 200;
         SUBSIDY.subsidize{value: 1 ether}(address(bridge), criteria, gasPerMinute);
-        //
-        // SUBSIDY.registerBeneficiary(BENEFICIARY);
-        //
-        // // Set the rollupBeneficiary on BridgeTestBase so that it gets included in the proofData
-        // ROLLUP_ENCODER.setRollupBeneficiary(BENEFICIARY);
+
+         SUBSIDY.registerBeneficiary(BENEFICIARY);
+        
+        // Set the rollupBeneficiary on BridgeTestBase so that it gets included in the proofData
+         ROLLUP_ENCODER.setRollupBeneficiary(BENEFICIARY);
     }
 
     // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
