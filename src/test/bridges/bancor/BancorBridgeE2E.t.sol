@@ -26,8 +26,20 @@ contract BancorBridgeE2ETest is BridgeTestBase {
     uint256 private id;
 
     function setUp() public {
+        uint256[] memory criterias = new uint256[](2);
+        uint32[] memory gasUsage = new uint32[](2);
+        uint32[] memory minGasPerMinute = new uint32[](2);
+
+        criterias[0] = uint256(keccak256(abi.encodePacked(DAI, USDC)));
+        criterias[1] = uint256(keccak256(abi.encodePacked(USDC, DAI)));
+
+        gasUsage[0] = 72896;
+        gasUsage[1] = 80249;
+
+        minGasPerMinute[0] = 100;
+        minGasPerMinute[1] = 150;
         // Deploy a new example bridge
-        bridge = new BancorBridge(address(ROLLUP_PROCESSOR));
+        bridge = new BancorBridge(address(ROLLUP_PROCESSOR), criterias, gasUsage, minGasPerMinute);
 
 
         // Use the label to mark the bridge address with "Bancor Bridge" in the traces
@@ -65,10 +77,10 @@ contract BancorBridgeE2ETest is BridgeTestBase {
         uint32 gasPerMinute = 200;
         SUBSIDY.subsidize{value: 1 ether}(address(bridge), criteria, gasPerMinute);
 
-         SUBSIDY.registerBeneficiary(BENEFICIARY);
+        SUBSIDY.registerBeneficiary(BENEFICIARY);
 
         // Set the rollupBeneficiary on BridgeTestBase so that it gets included in the proofData
-         ROLLUP_ENCODER.setRollupBeneficiary(BENEFICIARY);
+        ROLLUP_ENCODER.setRollupBeneficiary(BENEFICIARY);
     }
 
     // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
