@@ -140,7 +140,7 @@ contract BancorBridge is BridgeBase {
               _totalInputValue,
               td.minReturnAmount,
               td.deadline,
-              _rollupBeneficiary
+              address(this)
             );
 
             if (outputIsEth) {

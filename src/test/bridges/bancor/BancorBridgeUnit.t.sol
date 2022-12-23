@@ -48,7 +48,8 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         bridge = new BancorBridge(rollupProcessor, criterias, gasUsage, minGasPerMinute);
         vm.startPrank(MULTI_SIG);
         ROLLUP_PROCESSOR.setSupportedBridge(address(bridge), 1500000);
-        ROLLUP_PROCESSOR.setSupportedAsset(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 55000); // USDC
+        ROLLUP_PROCESSOR.setSupportedAsset(USDC, 100000);
+        ROLLUP_PROCESSOR.setSupportedAsset(DAI, 100000);
         vm.stopPrank();
 
         // Set ETH balance of bridge and BENEFICIARY to 0 for clarity (somebody sent ETH to that address on mainnet)
@@ -63,8 +64,11 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         AztecTypes.AztecAsset memory daiAsset = ROLLUP_ENCODER.getRealAztecAsset(DAI);
 
         uint256 criteria = bridge.computeCriteria(daiAsset, emptyAsset, usdcAsset, emptyAsset, 0);
+        uint256 criteria1 = bridge.computeCriteria(usdcAsset, emptyAsset, daiAsset, emptyAsset, 0);
+
         uint32 gasPerMinute = 200;
         SUBSIDY.subsidize{value: 1 ether}(address(bridge), criteria, gasPerMinute);
+        SUBSIDY.subsidize{value: 1 ether}(address(bridge), criteria1, gasPerMinute);
 
         SUBSIDY.registerBeneficiary(BENEFICIARY);
     }
@@ -105,25 +109,29 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         assertEq(returnedDeadlineUSDC, currentTime, "Decoded deadline timeUSDC data does not match");
     }
 
-    function testExampleBridgeUnitTestFixed() public {
-        testExampleBridgeUnitTest(10);
+    function testBancorBridgeUnitTestFixed() public {
+        testBancorBridgeUnitTest(10 * 1e6); //multiplied by 1e6 to make 10 USDC
     }
 
-    // function testExampleBridgeUnitTestUSDCFixed() public {
-    //     testExampleBridgeUnitTestUSDC(10);
-    // }
+    function testBancorBridgeUnitTestUSDCFixed() public {
+        testBancorBridgeUnitTestUSDC(10 ether);
+    }
 
     // @notice The purpose of this test is to directly test convert functionality of the bridge.
     // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
-    function testExampleBridgeUnitTest(uint96 _depositAmount) public {
+    function testBancorBridgeUnitTest(uint96 _depositAmount) public {
         vm.warp(block.timestamp + 1 days);
+        // needed to ensure _depositAmount is largest enough to not cause bancor network contract to fail
+        if(_depositAmount < 1 * 1e6) {
+          _depositAmount = 1 * 1e6;
+        }
 
         // Define input and output assets
         AztecTypes.AztecAsset memory inputAssetA =
-            AztecTypes.AztecAsset({id: 1, erc20Address: USDC, assetType: AztecTypes.AztecAssetType.ERC20});
+            AztecTypes.AztecAsset({id: 2, erc20Address: USDC, assetType: AztecTypes.AztecAssetType.ERC20});
 
         AztecTypes.AztecAsset memory outputAssetA =
-            AztecTypes.AztecAsset({id: 2, erc20Address: DAI, assetType: AztecTypes.AztecAssetType.ERC20});
+            AztecTypes.AztecAsset({id: 1, erc20Address: DAI, assetType: AztecTypes.AztecAssetType.ERC20});
 
         // Rollup processor transfers ERC20 tokens to the bridge before calling convert. Since we are calling
         // bridge.convert(...) function directly we have to transfer the funds in the test on our own. In this case
@@ -149,9 +157,76 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         uint256 daiBalanceBefore = IERC20(DAI).balanceOf(rollupProcessor);
 
         uint32 currentTime = uint32(block.timestamp) + 10000;
-        uint256 minimumPriceData = _depositAmount;
+        uint256 minimumPriceData = 9;
         uint64 encodedData = bridge.encodeTradeData(minimumPriceData, currentTime);
 
+
+        (uint256 outputValueA, uint256 outputValueB, bool isAsync) = bridge.convert(
+            inputAssetA, // USDC
+            emptyAsset, // _inputAssetB - not used so can be left empty
+            outputAssetA, // DAI
+            emptyAsset, // _outputAssetB - not used so can be left empty
+            _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
+            1, // _interactionNonce
+            encodedData, // _auxData - not used in the example bridge
+            BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
+        );
+        emit log_named_uint("Convert Function Called, output value is", outputValueA);
+
+        // Now we transfer the funds back from the bridge to the rollup processor
+          IERC20(outputAssetA.erc20Address).transferFrom(address(bridge), rollupProcessor, outputValueA);
+        // retrieve DAI balance of rollup processor
+        uint256 daiBalanceAfter = IERC20(DAI).balanceOf(rollupProcessor);
+
+         assertEq(outputValueA, daiBalanceAfter, "Output value was not transfered to the rollup processor");
+         assertEq(outputValueB, 0, "Output value B is not 0");
+         assertTrue(!isAsync, "Bridge is incorrectly in an async mode");
+
+         assertEq(daiBalanceAfter - daiBalanceBefore, outputValueA, "Balances must match");
+
+         SUBSIDY.withdraw(BENEFICIARY);
+         assertGt(BENEFICIARY.balance, 0, "Subsidy was not claimed");
+    }
+
+    // @notice The purpose of this test is to directly test convert functionality of the bridge.
+    // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
+    function testBancorBridgeUnitTestUSDC(uint96 _depositAmount) public {
+        vm.warp(block.timestamp + 1 days);
+        // needed to ensure _depositAmount is largest enough to not cause bancor network contract to fail
+        if(_depositAmount < 1 ether) {
+          _depositAmount = 1.1 ether;
+        }
+        // Define input and output assets
+        AztecTypes.AztecAsset memory inputAssetA =
+            AztecTypes.AztecAsset({id: 1, erc20Address: DAI, assetType: AztecTypes.AztecAssetType.ERC20});
+
+        AztecTypes.AztecAsset memory outputAssetA =
+            AztecTypes.AztecAsset({id: 2, erc20Address: USDC, assetType: AztecTypes.AztecAssetType.ERC20});
+
+        // Rollup processor transfers ERC20 tokens to the bridge before calling convert. Since we are calling
+        // bridge.convert(...) function directly we have to transfer the funds in the test on our own. In this case
+        // we'll solve it by directly minting the _depositAmount of Dai to the bridge.
+        deal(DAI, address(bridge), _depositAmount);
+        // set up approvals for tokens on all sides
+                {
+                    address[] memory tokensIn = new address[](2);
+                    tokensIn[0] = USDC;
+                    tokensIn[1] = DAI;
+
+
+                    address[] memory tokensOut = new address[](2);
+                    tokensOut[0] = USDC;
+                    tokensOut[1] = DAI;
+
+
+                    bridge.preApproveTokens(tokensIn, tokensOut);
+                }
+        // Store dai balance before interaction to be able to verify the balance after interaction is correct
+        uint256 usdcBalanceBefore = IERC20(USDC).balanceOf(rollupProcessor);
+
+        uint32 currentTime = uint32(block.timestamp) + 10000;
+        uint256 minimumPriceData = 1;
+        uint64 encodedData = bridge.encodeTradeData(minimumPriceData, currentTime);
 
         (uint256 outputValueA, uint256 outputValueB, bool isAsync) = bridge.convert(
             inputAssetA, // _inputAssetA - definition of an input asset
@@ -159,73 +234,27 @@ contract BancorBridgeUnitTest is BridgeTestBase {
             outputAssetA, // _outputAssetA - in this example equal to input asset
             emptyAsset, // _outputAssetB - not used so can be left empty
             _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
-            1, // _interactionNonce
+            2, // _interactionNonce
             encodedData, // _auxData - not used in the example bridge
             BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
         );
-        //
-        // // Now we transfer the funds back from the bridge to the rollup processor
-        // // In this case input asset equals output asset so I only work with the input asset definition
-        // // Basically in all the real world use-cases output assets would differ from input assets
-        // IERC20(inputAssetA.erc20Address).transferFrom(address(bridge), rollupProcessor, outputValueA);
-        //
-        // assertEq(outputValueA, _depositAmount, "Output value A doesn't equal deposit amount");
-        // assertEq(outputValueB, 0, "Output value B is not 0");
-        // assertTrue(!isAsync, "Bridge is incorrectly in an async mode");
-        //
-        // uint256 daiBalanceAfter = IERC20(DAI).balanceOf(rollupProcessor);
-        //
-        // assertEq(daiBalanceAfter - daiBalanceBefore, _depositAmount, "Balances must match");
-        //
-        // SUBSIDY.withdraw(BENEFICIARY);
-        // assertGt(BENEFICIARY.balance, 0, "Subsidy was not claimed");
-    }
 
-    // // @notice The purpose of this test is to directly test convert functionality of the bridge.
-    // // @dev In order to avoid overflows we set _depositAmount to be uint96 instead of uint256.
-    // function testExampleBridgeUnitTestUSDC(uint96 _depositAmount) public {
-    //     vm.warp(block.timestamp + 1 days);
-    //
-    //     // Define input and output assets
-    //     AztecTypes.AztecAsset memory inputAssetA =
-    //         AztecTypes.AztecAsset({id: 1, erc20Address: DAI, assetType: AztecTypes.AztecAssetType.ERC20});
-    //
-    //     AztecTypes.AztecAsset memory outputAssetA =
-    //         AztecTypes.AztecAsset({id: 1, erc20Address: USDC, assetType: AztecTypes.AztecAssetType.ERC20});
-    //
-    //     // Rollup processor transfers ERC20 tokens to the bridge before calling convert. Since we are calling
-    //     // bridge.convert(...) function directly we have to transfer the funds in the test on our own. In this case
-    //     // we'll solve it by directly minting the _depositAmount of Dai to the bridge.
-    //     deal(DAI, address(bridge), _depositAmount);
-    //
-    //     // Store dai balance before interaction to be able to verify the balance after interaction is correct
-    //     uint256 daiBalanceBefore = IERC20(DAI).balanceOf(rollupProcessor);
-    //
-    //     (uint256 outputValueA, uint256 outputValueB, bool isAsync) = bridge.convert(
-    //         inputAssetA, // _inputAssetA - definition of an input asset
-    //         emptyAsset, // _inputAssetB - not used so can be left empty
-    //         outputAssetA, // _outputAssetA - in this example equal to input asset
-    //         emptyAsset, // _outputAssetB - not used so can be left empty
-    //         _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
-    //         0, // _interactionNonce
-    //         0, // _auxData - not used in the example bridge
-    //         BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
-    //     );
-    //
-    //     // Now we transfer the funds back from the bridge to the rollup processor
-    //     // In this case input asset equals output asset so I only work with the input asset definition
-    //     // Basically in all the real world use-cases output assets would differ from input assets
-    //     IERC20(inputAssetA.erc20Address).transferFrom(address(bridge), rollupProcessor, outputValueA);
-    //
-    //     assertEq(outputValueA, _depositAmount, "Output value A doesn't equal deposit amount");
-    //     assertEq(outputValueB, 0, "Output value B is not 0");
-    //     assertTrue(!isAsync, "Bridge is incorrectly in an async mode");
-    //
-    //     uint256 daiBalanceAfter = IERC20(DAI).balanceOf(rollupProcessor);
-    //
-    //     assertEq(daiBalanceAfter - daiBalanceBefore, _depositAmount, "Balances must match");
-    //
-    //     SUBSIDY.withdraw(BENEFICIARY);
-    //     assertGt(BENEFICIARY.balance, 0, "Subsidy was not claimed");
-    // }
+          // Now we transfer the funds back from the bridge to the rollup processor
+          // In this case input asset equals output asset so I only work with the input asset definition
+          // Basically in all the real world use-cases output assets would differ from input assets
+          IERC20(outputAssetA.erc20Address).transferFrom(address(bridge), rollupProcessor, outputValueA);
+          // retrieve USDC balance of rollup processor
+          uint256 usdcBalanceAfter = IERC20(USDC).balanceOf(rollupProcessor);
+
+          assertEq(outputValueA, usdcBalanceAfter, "Output value was not transfered to the rollup processor");
+          assertEq(outputValueB, 0, "Output value B is not 0");
+          assertTrue(!isAsync, "Bridge is incorrectly in an async mode");
+
+          assertEq(usdcBalanceAfter - usdcBalanceBefore, outputValueA, "Balances must match");
+
+          assertGt(SUBSIDY.claimableAmount(BENEFICIARY), 0, "Claimable was not updated");
+
+          SUBSIDY.withdraw(BENEFICIARY);
+          assertGt(BENEFICIARY.balance, 0, "Subsidy was not claimed");
+    }
 }
