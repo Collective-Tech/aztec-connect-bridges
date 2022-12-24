@@ -5,7 +5,7 @@ pragma solidity >=0.8.4;
 import {BridgeTestBase} from "./../../aztec/base/BridgeTestBase.sol";
 import {AztecTypes} from "rollup-encoder/libraries/AztecTypes.sol";
 
-// Example-specific imports
+// Bancor-specific imports
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {BancorBridge} from "../../../bridges/bancor/BancorBridge.sol";
 import {ErrorLib} from "../../../bridges/base/ErrorLib.sol";
@@ -17,7 +17,7 @@ contract BancorBridgeUnitTest is BridgeTestBase {
     address private constant BENEFICIARY = address(11);
 
     address private rollupProcessor;
-    // The reference to the example bridge
+    // The reference to the Bancor bridge
     BancorBridge private bridge;
 
     struct TradeData {
@@ -44,7 +44,7 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         // In unit tests we set address of rollupProcessor to the address of this test contract
         rollupProcessor = address(this);
 
-        // Deploy a new example bridge
+        // Deploy a new Bancor bridge
         bridge = new BancorBridge(rollupProcessor, criterias, gasUsage, minGasPerMinute);
         vm.startPrank(MULTI_SIG);
         ROLLUP_PROCESSOR.setSupportedBridge(address(bridge), 1500000);
@@ -168,7 +168,7 @@ contract BancorBridgeUnitTest is BridgeTestBase {
             emptyAsset, // _outputAssetB - not used so can be left empty
             _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
             1, // _interactionNonce
-            encodedData, // _auxData - not used in the example bridge
+            encodedData, //
             BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
         );
         emit log_named_uint("Convert Function Called, output value is", outputValueA);
@@ -229,14 +229,14 @@ contract BancorBridgeUnitTest is BridgeTestBase {
         uint64 encodedData = bridge.encodeTradeData(minimumPriceData, currentTime);
 
         (uint256 outputValueA, uint256 outputValueB, bool isAsync) = bridge.convert(
-            inputAssetA, // _inputAssetA - definition of an input asset
-            emptyAsset, // _inputAssetB - not used so can be left empty
-            outputAssetA, // _outputAssetA - in this example equal to input asset
-            emptyAsset, // _outputAssetB - not used so can be left empty
-            _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
-            2, // _interactionNonce
-            encodedData, // _auxData - not used in the example bridge
-            BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
+          inputAssetA, // USDC
+          emptyAsset, // _inputAssetB - not used so can be left empty
+          outputAssetA, // DAI
+          emptyAsset, // _outputAssetB - not used so can be left empty
+          _depositAmount, // _totalInputValue - an amount of input asset A sent to the bridge
+          2, // _interactionNonce
+          encodedData, // _auxData
+          BENEFICIARY // _rollupBeneficiary - address, the subsidy will be sent to
         );
 
           // Now we transfer the funds back from the bridge to the rollup processor

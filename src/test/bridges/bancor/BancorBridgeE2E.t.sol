@@ -5,7 +5,7 @@ pragma solidity >=0.8.4;
 import {BridgeTestBase} from "./../../aztec/base/BridgeTestBase.sol";
 import {AztecTypes} from "rollup-encoder/libraries/AztecTypes.sol";
 
-// Example-specific imports
+// Bancor-specific imports
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {BancorBridge} from "../../../bridges/bancor/BancorBridge.sol";
 import {ErrorLib} from "../../../bridges/base/ErrorLib.sol";
@@ -38,7 +38,7 @@ contract BancorBridgeE2ETest is BridgeTestBase {
 
         minGasPerMinute[0] = 100;
         minGasPerMinute[1] = 150;
-        // Deploy a new example bridge
+        // Deploy a new Bancor bridge
         bridge = new BancorBridge(address(ROLLUP_PROCESSOR), criterias, gasUsage, minGasPerMinute);
 
 
@@ -51,7 +51,7 @@ contract BancorBridgeE2ETest is BridgeTestBase {
         // Impersonate the multi-sig to add a new bridge
         vm.startPrank(MULTI_SIG);
 
-        // List the example-bridge with a gasLimit of 120k
+        // List the Bancor-bridge with a gasLimit of 120k
         // WARNING: If you set this value too low the interaction will fail for seemingly no reason!
         // OTOH if you see it too high bridge users will pay too much
         ROLLUP_PROCESSOR.setSupportedBridge(address(bridge), 120000);
@@ -65,7 +65,7 @@ contract BancorBridgeE2ETest is BridgeTestBase {
 
         vm.stopPrank();
 
-        // Fetch the id of the example bridge
+        // Fetch the id of the Bancor bridge
         id = ROLLUP_PROCESSOR.getSupportedBridgesLength();
 
         // Subsidize the bridge when used with USDC and DAI and register a beneficiary
